@@ -164,6 +164,22 @@ func (this *CrossChainManager) ImportOuterTransfer(sourceChainId uint64, txData 
 	return this.mcSdk.SendTransaction(tx)
 }
 
+func (this *CrossChainManager) GetFiscoHeightInProcessing(chainId uint64, contractAddr []byte) (uint32, error) {
+	raw, err := this.mcSdk.GetStorage(CrossChainManagerContractAddress.ToHexString(),
+		append(append([]byte(hsc.LATEST_HEIGHT_IN_PROCESSING), mcnsu.GetUint64Bytes(chainId)...), contractAddr...))
+	if err != nil {
+		return 0, err
+	}
+	return mcnsu.GetBytesUint32(raw), nil
+}
+
+func (this *CrossChainManager) RelayCrossChainInfo(sourceChainId uint64, sigForInfo, crossChainInfo,
+	relayerAddress []byte, certs *hsc.CertTrustChain, signer *Account) (common.Uint256, error) {
+	sink := common.NewZeroCopySink(nil)
+	certs.Serialization(sink)
+	return this.ImportOuterTransfer(sourceChainId, crossChainInfo, 0, sigForInfo, relayerAddress, sink.Bytes(), signer)
+}
+
 func (this *CrossChainManager) NewBlackChainTransaction(chainID uint64) (*types.Transaction, error) {
 	state := &ccm.BlackChainParam{
 		ChainID: chainID,
@@ -281,6 +297,10 @@ func (this *HeaderSync) SyncGenesisHeader(chainId uint64, genesisHeader []byte, 
 		}
 	}
 	return this.mcSdk.SendTransaction(tx)
+}
+
+func (this *HeaderSync) SyncRootCertificate(chainId uint64, cert []byte, signers []*Account) (common.Uint256, error) {
+	return this.SyncGenesisHeader(chainId, cert, signers)
 }
 
 func (this *HeaderSync) NewSyncBlockHeaderTransaction(chainId uint64, address common.Address, headers [][]byte) (*types.Transaction, error) {
