@@ -18,6 +18,7 @@ package poly_go_sdk
 
 import (
 	"fmt"
+
 	"github.com/ontio/ontology-crypto/keypair"
 	sdkcom "github.com/polynetwork/poly-go-sdk/common"
 	"github.com/polynetwork/poly/common"
@@ -348,6 +349,11 @@ type SideChainManager struct {
 
 func (this *SideChainManager) NewRegisterSideChainTransaction(address common.Address, chainId, router uint64,
 	name string, blocksToWait uint64, CMCCAddress []byte) (*types.Transaction, error) {
+	return this.NewRegisterSideChainTransactionExt(address, chainId, router, name, blocksToWait, CMCCAddress, nil)
+}
+
+func (this *SideChainManager) NewRegisterSideChainTransactionExt(address common.Address, chainId, router uint64,
+	name string, blocksToWait uint64, CMCCAddress, extraInfo []byte) (*types.Transaction, error) {
 	state := &side_chain_manager.RegisterSideChainParam{
 		Address:      address,
 		ChainId:      chainId,
@@ -355,6 +361,7 @@ func (this *SideChainManager) NewRegisterSideChainTransaction(address common.Add
 		Name:         name,
 		BlocksToWait: blocksToWait,
 		CCMCAddress:  CMCCAddress,
+		ExtraInfo:    extraInfo,
 	}
 
 	sink := new(common.ZeroCopySink)
@@ -369,9 +376,10 @@ func (this *SideChainManager) NewRegisterSideChainTransaction(address common.Add
 		side_chain_manager.REGISTER_SIDE_CHAIN,
 		sink.Bytes())
 }
-func (this *SideChainManager) RegisterSideChain(address common.Address, chainId, router uint64, name string,
-	blocksToWait uint64, CMCCAddress []byte, signer *Account) (common.Uint256, error) {
-	tx, err := this.NewRegisterSideChainTransaction(address, chainId, router, name, blocksToWait, CMCCAddress)
+
+func (this *SideChainManager) RegisterSideChainExt(address common.Address, chainId, router uint64, name string,
+	blocksToWait uint64, CMCCAddress, extraInfo []byte, signer *Account) (common.Uint256, error) {
+	tx, err := this.NewRegisterSideChainTransactionExt(address, chainId, router, name, blocksToWait, CMCCAddress, extraInfo)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
@@ -380,6 +388,11 @@ func (this *SideChainManager) RegisterSideChain(address common.Address, chainId,
 		return common.UINT256_EMPTY, err
 	}
 	return this.mcSdk.SendTransaction(tx)
+}
+
+func (this *SideChainManager) RegisterSideChain(address common.Address, chainId, router uint64, name string,
+	blocksToWait uint64, CMCCAddress []byte, signer *Account) (common.Uint256, error) {
+	return this.RegisterSideChainExt(address, chainId, router, name, blocksToWait, CMCCAddress, nil, signer)
 }
 
 func (this *SideChainManager) NewApproveRegisterSideChainTransaction(chainId uint64, address common.Address) (*types.Transaction, error) {
