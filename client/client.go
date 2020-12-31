@@ -267,7 +267,7 @@ func (this *ClientMgr) GetHeaderByHeight(height uint32) (*types.Header, error) {
 
 }
 
-func (this *ClientMgr) GetStateMerkleRoot(height uint32) (string, error) {
+func (this *ClientMgr) GetStateMerkleRoot(height uint32) (hex string, err error) {
 	client := this.getClient()
 	if client == nil {
 		return "", fmt.Errorf("don't have available client of ORChain")
@@ -276,8 +276,8 @@ func (this *ClientMgr) GetStateMerkleRoot(height uint32) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(root), nil
-
+	err = json.Unmarshal(root, &hex)
+	return
 }
 
 func (this *ClientMgr) GetMemPoolTxState(txHash string) (*sdkcom.MemPoolTxState, error) {
