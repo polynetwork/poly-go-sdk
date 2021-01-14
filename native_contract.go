@@ -192,7 +192,7 @@ func (this *CrossChainManager) BlackChain(chainID uint64, signers []*Account) (c
 	}
 
 	for _, signer := range signers {
-		err = this.mcSdk.MultiSignToTransaction(tx, uint16(len(signers) + (len(signers) - 1) / 3), pubKeys, signer)
+		err = this.mcSdk.MultiSignToTransaction(tx, uint16(len(signers)-(len(signers)-1)/3), pubKeys, signer)
 		if err != nil {
 			return common.UINT256_EMPTY, fmt.Errorf("multi sign failed, err: %s", err)
 		}
@@ -231,7 +231,7 @@ func (this *CrossChainManager) WhiteChain(chainID uint64, signers []*Account) (c
 	}
 
 	for _, signer := range signers {
-		err = this.mcSdk.MultiSignToTransaction(tx, uint16(len(signers) + (len(signers) - 1) / 3), pubKeys, signer)
+		err = this.mcSdk.MultiSignToTransaction(tx, uint16(len(signers)-(len(signers)-1)/3), pubKeys, signer)
 		if err != nil {
 			return common.UINT256_EMPTY, fmt.Errorf("multi sign failed, err: %s", err)
 		}
@@ -276,7 +276,7 @@ func (this *HeaderSync) SyncGenesisHeader(chainId uint64, genesisHeader []byte, 
 	}
 
 	for _, signer := range signers {
-		err = this.mcSdk.MultiSignToTransaction(tx, uint16(len(signers) + (len(signers) - 1) / 3), pubKeys, signer)
+		err = this.mcSdk.MultiSignToTransaction(tx, uint16(len(signers)-(len(signers)-1)/3), pubKeys, signer)
 		if err != nil {
 			return common.UINT256_EMPTY, fmt.Errorf("multi sign failed, err: %s", err)
 		}
@@ -853,7 +853,7 @@ func (this *NodeManager) UpdateConfig(blockMsgDelay, hashMsgDelay,
 	}
 
 	for _, signer := range signers {
-		err = this.mcSdk.MultiSignToTransaction(tx, uint16(len(signers) + (len(signers) - 1) / 3), pubKeys, signer)
+		err = this.mcSdk.MultiSignToTransaction(tx, uint16(len(signers)-(len(signers)-1)/3), pubKeys, signer)
 		if err != nil {
 			return common.UINT256_EMPTY, fmt.Errorf("multi sign failed, err: %s", err)
 		}
@@ -1003,7 +1003,7 @@ func (this *NodeManager) CommitDpos(signers []*Account) (common.Uint256, error) 
 	}
 
 	for _, signer := range signers {
-		err = this.mcSdk.MultiSignToTransaction(tx, uint16(len(signers) + (len(signers) - 1) / 3), pubKeys, signer)
+		err = this.mcSdk.MultiSignToTransaction(tx, uint16(len(signers)-(len(signers)-1)/3), pubKeys, signer)
 		if err != nil {
 			return common.UINT256_EMPTY, fmt.Errorf("multi sign failed, err: %s", err)
 		}
