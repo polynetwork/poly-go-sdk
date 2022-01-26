@@ -18,6 +18,7 @@ package poly_go_sdk
 
 import (
 	"fmt"
+	"github.com/polynetwork/poly/native/service/governance/replenish"
 
 	"github.com/ontio/ontology-crypto/keypair"
 	sdkcom "github.com/polynetwork/poly-go-sdk/common"
@@ -40,6 +41,7 @@ var (
 	SideChainManagerContractAddress  = mcnsu.SideChainManagerContractAddress
 	NodeManagerContractAddress       = mcnsu.NodeManagerContractAddress
 	RelayerManagerContractAddress    = mcnsu.RelayerManagerContractAddress
+	ReplenishContractAddress         = mcnsu.ReplenishContractAddress
 )
 
 var (
@@ -56,6 +58,7 @@ type NativeContract struct {
 	Scm   *SideChainManager
 	Nm    *NodeManager
 	Rm    *RelayerManager
+	Rp    *Replenish
 }
 
 func newNativeContract(mcSdk *PolySdk) *NativeContract {
@@ -65,6 +68,7 @@ func newNativeContract(mcSdk *PolySdk) *NativeContract {
 	native.Scm = &SideChainManager{native: native, mcSdk: mcSdk}
 	native.Nm = &NodeManager{native: native, mcSdk: mcSdk}
 	native.Rm = &RelayerManager{native: native, mcSdk: mcSdk}
+	native.Rp = &Replenish{native: native, mcSdk: mcSdk}
 	return native
 }
 
@@ -1009,6 +1013,39 @@ func (this *NodeManager) CommitDpos(signers []*Account) (common.Uint256, error) 
 		}
 	}
 
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.mcSdk.SendTransaction(tx)
+}
+
+type Replenish struct {
+	mcSdk  *PolySdk
+	native *NativeContract
+}
+
+func (this *Replenish) NewReplenishTxTransaction(chainId uint64, txHashes []string) (*types.Transaction, error) {
+	state := &replenish.ReplenishTxParam{
+		ChainId:  chainId,
+		TxHashes: txHashes,
+	}
+
+	sink := new(common.ZeroCopySink)
+	state.Serialization(sink)
+
+	return this.native.NewNativeInvokeTransaction(
+		TX_VERSION,
+		ReplenishContractAddress,
+		replenish.REPLENISH_TX,
+		sink.Bytes())
+}
+
+func (this *Replenish) ReplenishTx(chainId uint64, txHashes []string, signer *Account) (common.Uint256, error) {
+	tx, err := this.NewReplenishTxTransaction(chainId, txHashes)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.mcSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
