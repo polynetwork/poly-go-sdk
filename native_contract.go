@@ -14,19 +14,21 @@
 * You should have received a copy of the GNU Lesser General Public License
 * along with The poly network . If not, see <http://www.gnu.org/licenses/>.
  */
+
 package poly_go_sdk
 
 import (
 	"fmt"
-	"github.com/polynetwork/poly/native/service/governance/replenish"
 
 	"github.com/ontio/ontology-crypto/keypair"
 	sdkcom "github.com/polynetwork/poly-go-sdk/common"
 	"github.com/polynetwork/poly/common"
 	"github.com/polynetwork/poly/core/types"
 	nccmc "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
+	"github.com/polynetwork/poly/native/service/cross_chain_manager/ripple"
 	"github.com/polynetwork/poly/native/service/governance/node_manager"
 	"github.com/polynetwork/poly/native/service/governance/relayer_manager"
+	"github.com/polynetwork/poly/native/service/governance/replenish"
 	"github.com/polynetwork/poly/native/service/governance/side_chain_manager"
 	hsc "github.com/polynetwork/poly/native/service/header_sync/common"
 	mcnsu "github.com/polynetwork/poly/native/service/utils"
@@ -100,6 +102,36 @@ func (this *NativeContract) PreExecInvokeNativeContract(
 type CrossChainManager struct {
 	mcSdk  *PolySdk
 	native *NativeContract
+}
+
+func (this *CrossChainManager) NewMultiSignRippleTransaction(chainId uint64, assetAddress, id []byte, txJson string) (*types.Transaction, error) {
+	state := &ripple.MultiSignParam{
+		ChainId:      chainId,
+		AssetAddress: assetAddress,
+		Id:           id,
+		TxJson:       txJson,
+	}
+
+	sink := new(common.ZeroCopySink)
+	state.Serialization(sink)
+
+	return this.native.NewNativeInvokeTransaction(
+		TX_VERSION,
+		CrossChainManagerContractAddress,
+		nccmc.MULTI_SIGN_RIPPLE,
+		sink.Bytes())
+}
+
+func (this *CrossChainManager) MultiSignRipple(chainId uint64, assetAddress, id []byte, txJson string, signer *Account) (common.Uint256, error) {
+	tx, err := this.NewMultiSignRippleTransaction(chainId, assetAddress, id, txJson)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.mcSdk.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.mcSdk.SendTransaction(tx)
 }
 
 func (this *CrossChainManager) NewBtcMultiSignTransaction(chainId uint64, redeemKey string, txHash []byte, address string, signs [][]byte) (*types.Transaction, error) {
