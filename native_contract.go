@@ -24,12 +24,10 @@ import (
 	sdkcom "github.com/polynetwork/poly-go-sdk/common"
 	"github.com/polynetwork/poly/common"
 	"github.com/polynetwork/poly/core/types"
-	ccm "github.com/polynetwork/poly/native/service/cross_chain_manager"
 	nccmc "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
 	"github.com/polynetwork/poly/native/service/governance/node_manager"
 	"github.com/polynetwork/poly/native/service/governance/relayer_manager"
 	"github.com/polynetwork/poly/native/service/governance/side_chain_manager"
-	hs "github.com/polynetwork/poly/native/service/header_sync"
 	hsc "github.com/polynetwork/poly/native/service/header_sync/common"
 	mcnsu "github.com/polynetwork/poly/native/service/utils"
 	"github.com/polynetwork/poly/native/states"
@@ -119,7 +117,7 @@ func (this *CrossChainManager) NewBtcMultiSignTransaction(chainId uint64, redeem
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		CrossChainManagerContractAddress,
-		ccm.MULTI_SIGN,
+		nccmc.MULTI_SIGN,
 		sink.Bytes())
 }
 
@@ -152,7 +150,7 @@ func (this *CrossChainManager) NewImportOuterTransferTransaction(sourceChainId u
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		CrossChainManagerContractAddress,
-		ccm.IMPORT_OUTER_TRANSFER_NAME,
+		nccmc.IMPORT_OUTER_TRANSFER_NAME,
 		sink.Bytes())
 }
 
@@ -170,7 +168,7 @@ func (this *CrossChainManager) ImportOuterTransfer(sourceChainId uint64, txData 
 }
 
 func (this *CrossChainManager) NewBlackChainTransaction(chainID uint64) (*types.Transaction, error) {
-	state := &ccm.BlackChainParam{
+	state := &nccmc.BlackChainParam{
 		ChainID: chainID,
 	}
 
@@ -180,7 +178,7 @@ func (this *CrossChainManager) NewBlackChainTransaction(chainID uint64) (*types.
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		CrossChainManagerContractAddress,
-		ccm.BLACK_CHAIN,
+		nccmc.BLACK_CHAIN,
 		sink.Bytes())
 }
 
@@ -209,7 +207,7 @@ func (this *CrossChainManager) BlackChain(chainID uint64, signers []*Account) (c
 }
 
 func (this *CrossChainManager) NewWhiteChainTransaction(chainID uint64) (*types.Transaction, error) {
-	state := &ccm.BlackChainParam{
+	state := &nccmc.BlackChainParam{
 		ChainID: chainID,
 	}
 
@@ -219,7 +217,7 @@ func (this *CrossChainManager) NewWhiteChainTransaction(chainID uint64) (*types.
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		CrossChainManagerContractAddress,
-		ccm.WHITE_CHAIN,
+		nccmc.WHITE_CHAIN,
 		sink.Bytes())
 }
 
@@ -264,7 +262,7 @@ func (this *HeaderSync) NewSyncGenesisHeaderTransaction(chainId uint64, genesisH
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		HeaderSyncContractAddress,
-		hs.SYNC_GENESIS_HEADER,
+		hsc.SYNC_GENESIS_HEADER,
 		sink.Bytes())
 }
 
@@ -301,7 +299,7 @@ func (this *HeaderSync) NewSyncBlockHeaderTransaction(chainId uint64, address co
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		HeaderSyncContractAddress,
-		hs.SYNC_BLOCK_HEADER,
+		hsc.SYNC_BLOCK_HEADER,
 		sink.Bytes())
 }
 
@@ -330,7 +328,7 @@ func (this *HeaderSync) NewSyncCrossChainMsgTransaction(chainId uint64, address 
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		HeaderSyncContractAddress,
-		hs.SYNC_CROSS_CHAIN_MSG,
+		hsc.SYNC_CROSS_CHAIN_MSG,
 		sink.Bytes())
 }
 
