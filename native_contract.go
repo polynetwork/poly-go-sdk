@@ -619,6 +619,35 @@ func (this *SideChainManager) RegisterRedeem(redeemChainID, contractChainID uint
 	return this.mcSdk.SendTransaction(tx)
 }
 
+func (this *SideChainManager) NewRegisterAssetMapTransaction(operatorAddress common.Address,
+	assetMap map[uint64]*side_chain_manager.AssetInfo) (*types.Transaction, error) {
+	state := &side_chain_manager.RegisterAssetParam{
+		OperatorAddress: operatorAddress,
+		AssetMap:        assetMap,
+	}
+
+	sink := new(common.ZeroCopySink)
+	state.Serialization(sink)
+
+	return this.native.NewNativeInvokeTransaction(
+		TX_VERSION,
+		SideChainManagerContractAddress,
+		side_chain_manager.REGISTER_ASSET_MAP,
+		sink.Bytes())
+}
+
+func (this *SideChainManager) RegisterAssetMap(assetMap map[uint64]*side_chain_manager.AssetInfo, signer *Account) (common.Uint256, error) {
+	tx, err := this.NewRegisterAssetMapTransaction(signer.Address, assetMap)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.mcSdk.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.mcSdk.SendTransaction(tx)
+}
+
 func (this *SideChainManager) NewSetBtcTxParamTransaction(redeem []byte, redeemId, feeRate, minChange, pver uint64, sigArr [][]byte) (*types.Transaction, error) {
 	state := &side_chain_manager.BtcTxParam{
 		Detial: &side_chain_manager.BtcTxParamDetial{
