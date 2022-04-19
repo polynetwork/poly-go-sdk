@@ -19,6 +19,7 @@ package poly_go_sdk
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ontio/ontology-crypto/keypair"
 	sdkcom "github.com/polynetwork/poly-go-sdk/common"
@@ -104,11 +105,13 @@ type CrossChainManager struct {
 	native *NativeContract
 }
 
-func (this *CrossChainManager) NewMultiSignRippleTransaction(chainId uint64, assetAddress, id []byte, txJson string) (*types.Transaction, error) {
+func (this *CrossChainManager) NewMultiSignRippleTransaction(toChainId, fromChainId uint64, assetAddress,
+	txHash []byte, txJson string) (*types.Transaction, error) {
 	state := &ripple.MultiSignParam{
-		ChainId:      chainId,
+		ToChainId:    toChainId,
 		AssetAddress: assetAddress,
-		Id:           id,
+		FromChainId:  fromChainId,
+		TxHash:       txHash,
 		TxJson:       txJson,
 	}
 
@@ -122,8 +125,40 @@ func (this *CrossChainManager) NewMultiSignRippleTransaction(chainId uint64, ass
 		sink.Bytes())
 }
 
-func (this *CrossChainManager) MultiSignRipple(chainId uint64, assetAddress, id []byte, txJson string, signer *Account) (common.Uint256, error) {
-	tx, err := this.NewMultiSignRippleTransaction(chainId, assetAddress, id, txJson)
+func (this *CrossChainManager) ReconstructRippleTx(toChainId, fromChainId uint64, txHash []byte,
+	signer *Account) (common.Uint256, error) {
+	tx, err := this.NewReconstructRippleTxTransaction(toChainId, fromChainId, txHash)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.mcSdk.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.mcSdk.SendTransaction(tx)
+}
+
+func (this *CrossChainManager) NewReconstructRippleTxTransaction(toChainId, fromChainId uint64,
+	txHash []byte) (*types.Transaction, error) {
+	state := &ripple.ReconstructTxParam{
+		FromChainId: fromChainId,
+		TxHash:      txHash,
+		ToChainId:   toChainId,
+	}
+
+	sink := new(common.ZeroCopySink)
+	state.Serialization(sink)
+
+	return this.native.NewNativeInvokeTransaction(
+		TX_VERSION,
+		CrossChainManagerContractAddress,
+		nccmc.RECONSTRUCT_RIPPLE_TX,
+		sink.Bytes())
+}
+
+func (this *CrossChainManager) MultiSignRipple(toChainId, fromChainId uint64, assetAddress, txHash []byte,
+	txJson string, signer *Account) (common.Uint256, error) {
+	tx, err := this.NewMultiSignRippleTransaction(toChainId, fromChainId, assetAddress, txHash, txJson)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
@@ -619,11 +654,13 @@ func (this *SideChainManager) RegisterRedeem(redeemChainID, contractChainID uint
 	return this.mcSdk.SendTransaction(tx)
 }
 
-func (this *SideChainManager) NewRegisterAssetMapTransaction(operatorAddress common.Address,
-	assetMap map[uint64]*side_chain_manager.AssetInfo) (*types.Transaction, error) {
+func (this *SideChainManager) NewRegisterAssetTransaction(operatorAddress common.Address, chainId uint64,
+	lockProxyMap map[uint64][]byte, assetMap map[uint64][]byte) (*types.Transaction, error) {
 	state := &side_chain_manager.RegisterAssetParam{
 		OperatorAddress: operatorAddress,
+		ChainId:         chainId,
 		AssetMap:        assetMap,
+		LockProxyMap:    lockProxyMap,
 	}
 
 	sink := new(common.ZeroCopySink)
@@ -632,12 +669,44 @@ func (this *SideChainManager) NewRegisterAssetMapTransaction(operatorAddress com
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		SideChainManagerContractAddress,
-		side_chain_manager.REGISTER_ASSET_MAP,
+		side_chain_manager.REGISTER_ASSET,
 		sink.Bytes())
 }
 
-func (this *SideChainManager) RegisterAssetMap(assetMap map[uint64]*side_chain_manager.AssetInfo, signer *Account) (common.Uint256, error) {
-	tx, err := this.NewRegisterAssetMapTransaction(signer.Address, assetMap)
+func (this *SideChainManager) RegisterAsset(lockProxyMap map[uint64][]byte, assetMap map[uint64][]byte, chainId uint64,
+	signer *Account) (common.Uint256, error) {
+	tx, err := this.NewRegisterAssetTransaction(signer.Address, chainId, lockProxyMap, assetMap)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.mcSdk.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.mcSdk.SendTransaction(tx)
+}
+
+func (this *SideChainManager) NewUpdateFeeTransaction(address common.Address,
+	chainId, view uint64, fee *big.Int) (*types.Transaction, error) {
+	state := &side_chain_manager.UpdateFeeParam{
+		Address: address,
+		ChainId: chainId,
+		View:    view,
+		Fee:     fee,
+	}
+
+	sink := new(common.ZeroCopySink)
+	state.Serialization(sink)
+
+	return this.native.NewNativeInvokeTransaction(
+		TX_VERSION,
+		SideChainManagerContractAddress,
+		side_chain_manager.UPDATE_FEE,
+		sink.Bytes())
+}
+
+func (this *SideChainManager) UpdateFee(chainId, view uint64, fee *big.Int, signer *Account) (common.Uint256, error) {
+	tx, err := this.NewUpdateFeeTransaction(signer.Address, chainId, view, fee)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}

@@ -14,7 +14,7 @@ require (
 )
 
 replace (
-	github.com/polynetwork/poly v1.8.4-0.20220310043944-b07dfc3df5f8 => github.com/siovanus/poly v1.7.3-0.20220311083551-df1ce0ad150c
+	github.com/polynetwork/poly v1.8.4-0.20220310043944-b07dfc3df5f8 => /Users/zhangmenghang/Documents/gopath/src/github.com/polynetwork/poly
 	github.com/polynetwork/ripple-sdk v1.0.0 => github.com/siovanus/ripple-sdk v1.0.1-0.20220311082414-84e86a29df1a
 	github.com/rubblelabs/ripple v0.0.0-20220222071018-38c1a8b14c18 => github.com/siovanus/ripple v0.0.0-20220311080636-cbff6a9e07ce
 	github.com/tendermint/tm-db/064 => github.com/tendermint/tm-db v0.6.4
