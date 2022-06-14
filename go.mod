@@ -7,12 +7,10 @@ require (
 	github.com/itchyny/base58-go v0.1.0
 	github.com/ontio/go-bip32 v0.0.0-20190520025953-d3cea6894a2b
 	github.com/ontio/ontology-crypto v1.0.9
-	github.com/polynetwork/poly v0.0.0-20210112063446-24e3d053e9d6
+	github.com/polynetwork/poly v1.9.1-0.20220512072724-0d14237fd9a1
 	github.com/stretchr/testify v1.7.0
 	github.com/tyler-smith/go-bip39 v1.0.2
-	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
+	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
 )
-
-replace github.com/polynetwork/poly => github.com/zhiqiangxu/poly v0.0.0-20220118102005-aab67df86c20
 
 replace github.com/tendermint/tm-db/064 => github.com/tendermint/tm-db v0.6.4

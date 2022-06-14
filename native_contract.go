@@ -14,22 +14,24 @@
 * You should have received a copy of the GNU Lesser General Public License
 * along with The poly network . If not, see <http://www.gnu.org/licenses/>.
  */
+
 package poly_go_sdk
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ontio/ontology-crypto/keypair"
 	sdkcom "github.com/polynetwork/poly-go-sdk/common"
 	"github.com/polynetwork/poly/common"
 	"github.com/polynetwork/poly/core/types"
-	ccm "github.com/polynetwork/poly/native/service/cross_chain_manager"
 	nccmc "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
+	"github.com/polynetwork/poly/native/service/cross_chain_manager/ripple"
 	"github.com/polynetwork/poly/native/service/governance/node_manager"
 	"github.com/polynetwork/poly/native/service/governance/relayer_manager"
+	"github.com/polynetwork/poly/native/service/governance/replenish"
 	"github.com/polynetwork/poly/native/service/governance/side_chain_manager"
 	"github.com/polynetwork/poly/native/service/governance/signature_manager"
-	hs "github.com/polynetwork/poly/native/service/header_sync"
 	hsc "github.com/polynetwork/poly/native/service/header_sync/common"
 	mcnsu "github.com/polynetwork/poly/native/service/utils"
 	"github.com/polynetwork/poly/native/states"
@@ -42,6 +44,7 @@ var (
 	NodeManagerContractAddress       = mcnsu.NodeManagerContractAddress
 	RelayerManagerContractAddress    = mcnsu.RelayerManagerContractAddress
 	SignatureManagerContractAddress  = mcnsu.SignatureManagerContractAddress
+	ReplenishContractAddress         = mcnsu.ReplenishContractAddress
 )
 
 var (
@@ -59,6 +62,7 @@ type NativeContract struct {
 	Nm    *NodeManager
 	Rm    *RelayerManager
 	Sm    *SignatureManager
+	Rp    *Replenish
 }
 
 func newNativeContract(mcSdk *PolySdk) *NativeContract {
@@ -69,6 +73,7 @@ func newNativeContract(mcSdk *PolySdk) *NativeContract {
 	native.Nm = &NodeManager{native: native, mcSdk: mcSdk}
 	native.Rm = &RelayerManager{native: native, mcSdk: mcSdk}
 	native.Sm = &SignatureManager{native: native, mcSdk: mcSdk}
+	native.Rp = &Replenish{native: native, mcSdk: mcSdk}
 	return native
 }
 
@@ -104,6 +109,70 @@ type CrossChainManager struct {
 	native *NativeContract
 }
 
+func (this *CrossChainManager) NewMultiSignRippleTransaction(toChainId, fromChainId uint64, assetAddress,
+	txHash []byte, txJson string) (*types.Transaction, error) {
+	state := &ripple.MultiSignParam{
+		ToChainId:    toChainId,
+		AssetAddress: assetAddress,
+		FromChainId:  fromChainId,
+		TxHash:       txHash,
+		TxJson:       txJson,
+	}
+
+	sink := new(common.ZeroCopySink)
+	state.Serialization(sink)
+
+	return this.native.NewNativeInvokeTransaction(
+		TX_VERSION,
+		CrossChainManagerContractAddress,
+		nccmc.MULTI_SIGN_RIPPLE,
+		sink.Bytes())
+}
+
+func (this *CrossChainManager) ReconstructRippleTx(toChainId, fromChainId uint64, txHash []byte,
+	signer *Account) (common.Uint256, error) {
+	tx, err := this.NewReconstructRippleTxTransaction(toChainId, fromChainId, txHash)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.mcSdk.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.mcSdk.SendTransaction(tx)
+}
+
+func (this *CrossChainManager) NewReconstructRippleTxTransaction(toChainId, fromChainId uint64,
+	txHash []byte) (*types.Transaction, error) {
+	state := &ripple.ReconstructTxParam{
+		FromChainId: fromChainId,
+		TxHash:      txHash,
+		ToChainId:   toChainId,
+	}
+
+	sink := new(common.ZeroCopySink)
+	state.Serialization(sink)
+
+	return this.native.NewNativeInvokeTransaction(
+		TX_VERSION,
+		CrossChainManagerContractAddress,
+		nccmc.RECONSTRUCT_RIPPLE_TX,
+		sink.Bytes())
+}
+
+func (this *CrossChainManager) MultiSignRipple(toChainId, fromChainId uint64, assetAddress, txHash []byte,
+	txJson string, signer *Account) (common.Uint256, error) {
+	tx, err := this.NewMultiSignRippleTransaction(toChainId, fromChainId, assetAddress, txHash, txJson)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.mcSdk.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.mcSdk.SendTransaction(tx)
+}
+
 func (this *CrossChainManager) NewBtcMultiSignTransaction(chainId uint64, redeemKey string, txHash []byte, address string, signs [][]byte) (*types.Transaction, error) {
 	state := &nccmc.MultiSignParam{
 		ChainID:   chainId,
@@ -119,7 +188,7 @@ func (this *CrossChainManager) NewBtcMultiSignTransaction(chainId uint64, redeem
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		CrossChainManagerContractAddress,
-		ccm.MULTI_SIGN,
+		nccmc.MULTI_SIGN,
 		sink.Bytes())
 }
 
@@ -152,7 +221,7 @@ func (this *CrossChainManager) NewImportOuterTransferTransaction(sourceChainId u
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		CrossChainManagerContractAddress,
-		ccm.IMPORT_OUTER_TRANSFER_NAME,
+		nccmc.IMPORT_OUTER_TRANSFER_NAME,
 		sink.Bytes())
 }
 
@@ -170,7 +239,7 @@ func (this *CrossChainManager) ImportOuterTransfer(sourceChainId uint64, txData 
 }
 
 func (this *CrossChainManager) NewBlackChainTransaction(chainID uint64) (*types.Transaction, error) {
-	state := &ccm.BlackChainParam{
+	state := &nccmc.BlackChainParam{
 		ChainID: chainID,
 	}
 
@@ -180,7 +249,7 @@ func (this *CrossChainManager) NewBlackChainTransaction(chainID uint64) (*types.
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		CrossChainManagerContractAddress,
-		ccm.BLACK_CHAIN,
+		nccmc.BLACK_CHAIN,
 		sink.Bytes())
 }
 
@@ -209,7 +278,7 @@ func (this *CrossChainManager) BlackChain(chainID uint64, signers []*Account) (c
 }
 
 func (this *CrossChainManager) NewWhiteChainTransaction(chainID uint64) (*types.Transaction, error) {
-	state := &ccm.BlackChainParam{
+	state := &nccmc.BlackChainParam{
 		ChainID: chainID,
 	}
 
@@ -219,7 +288,7 @@ func (this *CrossChainManager) NewWhiteChainTransaction(chainID uint64) (*types.
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		CrossChainManagerContractAddress,
-		ccm.WHITE_CHAIN,
+		nccmc.WHITE_CHAIN,
 		sink.Bytes())
 }
 
@@ -264,7 +333,7 @@ func (this *HeaderSync) NewSyncGenesisHeaderTransaction(chainId uint64, genesisH
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		HeaderSyncContractAddress,
-		hs.SYNC_GENESIS_HEADER,
+		hsc.SYNC_GENESIS_HEADER,
 		sink.Bytes())
 }
 
@@ -301,7 +370,7 @@ func (this *HeaderSync) NewSyncBlockHeaderTransaction(chainId uint64, address co
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		HeaderSyncContractAddress,
-		hs.SYNC_BLOCK_HEADER,
+		hsc.SYNC_BLOCK_HEADER,
 		sink.Bytes())
 }
 
@@ -330,7 +399,7 @@ func (this *HeaderSync) NewSyncCrossChainMsgTransaction(chainId uint64, address 
 	return this.native.NewNativeInvokeTransaction(
 		TX_VERSION,
 		HeaderSyncContractAddress,
-		hs.SYNC_CROSS_CHAIN_MSG,
+		hsc.SYNC_CROSS_CHAIN_MSG,
 		sink.Bytes())
 }
 
@@ -579,6 +648,69 @@ func (this *SideChainManager) NewRegisterRedeemTransaction(redeemChainID, contra
 func (this *SideChainManager) RegisterRedeem(redeemChainID, contractChainID uint64,
 	redeem, contractAddress []byte, cVersion uint64, signs [][]byte, signer *Account) (common.Uint256, error) {
 	tx, err := this.NewRegisterRedeemTransaction(redeemChainID, contractChainID, redeem, cVersion, contractAddress, signs)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.mcSdk.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.mcSdk.SendTransaction(tx)
+}
+
+func (this *SideChainManager) NewRegisterAssetTransaction(operatorAddress common.Address, chainId uint64,
+	lockProxyMap map[uint64][]byte, assetMap map[uint64][]byte) (*types.Transaction, error) {
+	state := &side_chain_manager.RegisterAssetParam{
+		OperatorAddress: operatorAddress,
+		ChainId:         chainId,
+		AssetMap:        assetMap,
+		LockProxyMap:    lockProxyMap,
+	}
+
+	sink := new(common.ZeroCopySink)
+	state.Serialization(sink)
+
+	return this.native.NewNativeInvokeTransaction(
+		TX_VERSION,
+		SideChainManagerContractAddress,
+		side_chain_manager.REGISTER_ASSET,
+		sink.Bytes())
+}
+
+func (this *SideChainManager) RegisterAsset(lockProxyMap map[uint64][]byte, assetMap map[uint64][]byte, chainId uint64,
+	signer *Account) (common.Uint256, error) {
+	tx, err := this.NewRegisterAssetTransaction(signer.Address, chainId, lockProxyMap, assetMap)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.mcSdk.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.mcSdk.SendTransaction(tx)
+}
+
+func (this *SideChainManager) NewUpdateFeeTransaction(address common.Address,
+	chainId, view uint64, fee *big.Int) (*types.Transaction, error) {
+	state := &side_chain_manager.UpdateFeeParam{
+		Address: address,
+		ChainId: chainId,
+		View:    view,
+		Fee:     fee,
+	}
+
+	sink := new(common.ZeroCopySink)
+	state.Serialization(sink)
+
+	return this.native.NewNativeInvokeTransaction(
+		TX_VERSION,
+		SideChainManagerContractAddress,
+		side_chain_manager.UPDATE_FEE,
+		sink.Bytes())
+}
+
+func (this *SideChainManager) UpdateFee(chainId, view uint64, fee *big.Int, signer *Account) (common.Uint256, error) {
+	tx, err := this.NewUpdateFeeTransaction(signer.Address, chainId, view, fee)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
@@ -1046,6 +1178,39 @@ func (this *NodeManager) CommitDpos(signers []*Account) (common.Uint256, error) 
 		}
 	}
 
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.mcSdk.SendTransaction(tx)
+}
+
+type Replenish struct {
+	mcSdk  *PolySdk
+	native *NativeContract
+}
+
+func (this *Replenish) NewReplenishTxTransaction(chainId uint64, txHashes []string) (*types.Transaction, error) {
+	state := &replenish.ReplenishTxParam{
+		ChainId:  chainId,
+		TxHashes: txHashes,
+	}
+
+	sink := new(common.ZeroCopySink)
+	state.Serialization(sink)
+
+	return this.native.NewNativeInvokeTransaction(
+		TX_VERSION,
+		ReplenishContractAddress,
+		replenish.REPLENISH_TX,
+		sink.Bytes())
+}
+
+func (this *Replenish) ReplenishTx(chainId uint64, txHashes []string, signer *Account) (common.Uint256, error) {
+	tx, err := this.NewReplenishTxTransaction(chainId, txHashes)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.mcSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
