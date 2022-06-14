@@ -31,6 +31,7 @@ import (
 	"github.com/polynetwork/poly/native/service/governance/relayer_manager"
 	"github.com/polynetwork/poly/native/service/governance/replenish"
 	"github.com/polynetwork/poly/native/service/governance/side_chain_manager"
+	"github.com/polynetwork/poly/native/service/governance/signature_manager"
 	hsc "github.com/polynetwork/poly/native/service/header_sync/common"
 	mcnsu "github.com/polynetwork/poly/native/service/utils"
 	"github.com/polynetwork/poly/native/states"
@@ -42,6 +43,7 @@ var (
 	SideChainManagerContractAddress  = mcnsu.SideChainManagerContractAddress
 	NodeManagerContractAddress       = mcnsu.NodeManagerContractAddress
 	RelayerManagerContractAddress    = mcnsu.RelayerManagerContractAddress
+	SignatureManagerContractAddress  = mcnsu.SignatureManagerContractAddress
 	ReplenishContractAddress         = mcnsu.ReplenishContractAddress
 )
 
@@ -59,6 +61,7 @@ type NativeContract struct {
 	Scm   *SideChainManager
 	Nm    *NodeManager
 	Rm    *RelayerManager
+	Sm    *SignatureManager
 	Rp    *Replenish
 }
 
@@ -69,6 +72,7 @@ func newNativeContract(mcSdk *PolySdk) *NativeContract {
 	native.Scm = &SideChainManager{native: native, mcSdk: mcSdk}
 	native.Nm = &NodeManager{native: native, mcSdk: mcSdk}
 	native.Rm = &RelayerManager{native: native, mcSdk: mcSdk}
+	native.Sm = &SignatureManager{native: native, mcSdk: mcSdk}
 	native.Rp = &Replenish{native: native, mcSdk: mcSdk}
 	return native
 }
@@ -1104,6 +1108,39 @@ func (this *RelayerManager) NewApproveRemoveRelayerTransaction(removeID uint64, 
 
 func (this *RelayerManager) ApproveRemoveRelayer(removeID uint64, signer *Account) (common.Uint256, error) {
 	tx, err := this.NewApproveRemoveRelayerTransaction(removeID, signer.Address)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.mcSdk.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.mcSdk.SendTransaction(tx)
+}
+
+type SignatureManager struct {
+	mcSdk  *PolySdk
+	native *NativeContract
+}
+
+func (this *SignatureManager) NewAddSignatureTransaction(address common.Address, sideChainID uint64, subject, sig []byte) (*types.Transaction, error) {
+	param := signature_manager.AddSignatureParam{
+		Address:     address,
+		SideChainID: sideChainID,
+		Subject:     subject,
+		Signature:   sig,
+	}
+	sink := common.NewZeroCopySink(nil)
+	param.Serialization(sink)
+	return this.native.NewNativeInvokeTransaction(
+		TX_VERSION,
+		SignatureManagerContractAddress,
+		signature_manager.ADD_SIGNATURE,
+		sink.Bytes())
+}
+
+func (this *SignatureManager) AddSignature(sideChainId uint64, subject, sig []byte, signer *Account) (common.Uint256, error) {
+	tx, err := this.NewAddSignatureTransaction(signer.Address, sideChainId, subject, sig)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
